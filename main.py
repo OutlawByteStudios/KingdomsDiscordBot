@@ -1,12 +1,17 @@
 import discord
 
 from os import urandom
-from github import Github
-from src.defines import TOKEN, GUILD, TARGET_CHANNEL, GITHUB_TOKEN
+from github import Github, GithubIntegration
+from src.defines import TOKEN, GUILD, TARGET_CHANNEL, GITHUB_APP_ID, GITHUB_CLIENT_ID
 from src.input_proccesors.vote import Vote
 from src.input_proccesors.suggestion import Suggestion
 
-github_client = Github(GITHUB_TOKEN)
+github_integration = GithubIntegration(GITHUB_APP_ID, open('angry-villager.2020-10-03.private-key.pem', 'r').read())
+installation = github_integration.get_installation('OutlawByteStudios', 'KingdomsDiscordBot')
+token = github_integration.create_jwt()
+
+
+github_client = Github('v1.e9827ef3291f575ac58d4def4ab428afc868806e')
 client = discord.Client()
 
 # Suggestions project = 5594461
@@ -39,8 +44,10 @@ async def on_message(message):
     if message.author == client.user:
         return
     if message.channel.name != TARGET_CHANNEL:
+        print('Wrong channel')
         return
     if not check_input(['!vote', '**Suggestion**'], message):
+        print('Wrong command')
         return
     await process_input(message)
 
