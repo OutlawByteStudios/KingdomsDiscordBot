@@ -1,69 +1,77 @@
-import discord
+import nextcord
+from src.defines import DISCORD_TOKEN
 
-from os import urandom
-from github import Github, GithubIntegration
-from src.defines import TOKEN, GUILD, TARGET_CHANNEL, GITHUB_APP_ID, GITHUB_CLIENT_ID
-from src.input_proccesors.vote import Vote
-from src.input_proccesors.suggestion import Suggestion
-
-github_integration = GithubIntegration(GITHUB_APP_ID, open('angry-villager.2020-10-03.private-key.pem', 'r').read())
-installation = github_integration.get_installation('OutlawByteStudios', 'KingdomsDiscordBot')
-token = github_integration.create_jwt()
+from nextcord.ext import commands
 
 
-github_client = Github('v1.e9827ef3291f575ac58d4def4ab428afc868806e')
-client = discord.Client()
+class SuggestModalView(nextcord.ui.Modal):
+    def __init__(self):
+        super().__init__(
+            "New Suggestion",
+            timeout=5 * 60,  # 5 minutes
+        )
 
-# Suggestions project = 5594461
-# Suggestions column = 11079851
-# Project Plan project id = 5594457
-project_kingdoms_suggestions_repo = github_client.get_repo(
-    'OutlawByteStudios/KingdomsDiscordBot')
-suggestion_column = github_client.get_project_column(11079851)
-suggestion_label = project_kingdoms_suggestions_repo.get_label('suggestion')
+        self.suggestion_title = nextcord.ui.TextInput(
+            label="Suggestion Title",
+            min_length=2,
+            max_length=50,
+        )
+        self.add_item(self.suggestion_title)
+
+#remove this
+        self.suggestion_topics = nextcord.ui.Select(
+            placeholder="select one or more topics your suggestion is about",
+            max_values=10,
+            min_values=1,
+            options=[
+                nextcord.SelectOption(label='Crafting'),
+                nextcord.SelectOption(label='Clans / Factions'),
+                nextcord.SelectOption(label='Siege'),
+                nextcord.SelectOption(label='Travel'),
+                nextcord.SelectOption(label='Economy'),
+                nextcord.SelectOption(label='Player Interaction'),
+                nextcord.SelectOption(label='User Interface'),
+                nextcord.SelectOption(label='Classes / Traits'),
+                nextcord.SelectOption(
+                    label='Interactables', description='Anything like carts, boats, ladders, bridges etc.'),
+                nextcord.SelectOption(label='Not on this list'),
+            ]
+        )
+        self.add_item(self.suggestion_topics)
+
+        self.description = nextcord.ui.TextInput(
+            label="Description",
+            style=nextcord.TextInputStyle.paragraph,
+            placeholder="Describe your suggestion compact and simple, otherwise split into multiple suggestions",
+            required=True,
+            max_length=400,
+        )
+        self.add_item(self.description)
+
+    async def callback(self, interaction: nextcord.Interaction) -> None:
+        response = f"New suggestion {self.suggestion_title.value} by {interaction.user.mention} [" + ', '.join(
+            option for option in self.suggestion_topics.values) + "]"
+        response += f"\n\n{self.description.value}"
+        await interaction.send(response)
 
 
-vote = Vote(project_kingdoms_suggestions_repo)
-suggestion = Suggestion(project_kingdoms_suggestions_repo,
-                        suggestion_column, suggestion_label)
-
-print(f'Repo has {project_kingdoms_suggestions_repo.open_issues} open issues')
+intents = nextcord.Intents.default()
+bot = commands.Bot(command_prefix='$', intents=intents)
 
 
-@client.event
+@bot.event
 async def on_ready():
-    guild = discord.utils.get(client.guilds, name=GUILD)
-    print(
-        f'{client.user} is connected to the following guild:\n'
-        f'{guild.name}(id: {guild.id})'
-    )
+    print(f'Logged in as {bot.user} (ID: {bot.user.id})')
 
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
-    if message.channel.name != TARGET_CHANNEL:
-        print('Wrong channel')
-        return
-    if not check_input(['!vote', '**Suggestion**'], message):
-        print('Wrong command')
-        return
-    await process_input(message)
+@bot.slash_command(
+    name="suggest",
+    description="Post a new suggestion",
+    guild_ids=[966368344037027901, 450652484634148875],
+)
+async def send(interaction: nextcord.Interaction):
+    modal = SuggestModalView()
+    await interaction.response.send_modal(modal)
 
 
-client.run(TOKEN)
-
-
-def check_input(list, message) -> bool:
-    for start_str in list:
-        if message.content.startswith(start_str):
-            return True
-    return False
-
-
-async def process_input(message):
-    if message.content.startswith('!vote'):
-        await vote.process(message)
-    elif message.content.startswith('**Suggestion**'):
-        await suggestion.process(message)
+bot.run(DISCORD_TOKEN)
